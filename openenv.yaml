@@ -1,0 +1,14 @@
+name: neuro-inclusive-ui-mutation
+description: Deterministic OpenEnv-style benchmark for repairing cluttered and inaccessible UI DOM trees.
+entry_point: person_a.environment:NeuroInclusiveEnv
+language:
+  name: python
+  runtime: "3.13"
+evaluation:
+  command: python run_eval.py
+  output_path: results.jsonl
+  episodes: 10
+metadata:
+  headless: true
+  deterministic: true
+  domain: ui-accessibility

@@ -1,0 +1,10 @@
+{"difficulty": "easy", "done": true, "episode": 1, "errors": [], "grade_score": 1.0, "num_commands": 11, "reward": 1.0, "task_id": "easy-7-000", "terminated": true, "truncated": false}
+{"difficulty": "medium", "done": true, "episode": 2, "errors": [], "grade_score": 0.8272, "num_commands": 27, "reward": 0.8272, "task_id": "medium-7-000", "terminated": false, "truncated": true}
+{"difficulty": "hard", "done": true, "episode": 3, "errors": [], "grade_score": 0.4711, "num_commands": 26, "reward": 0.4711, "task_id": "hard-7-000", "terminated": false, "truncated": true}
+{"difficulty": "easy", "done": true, "episode": 4, "errors": [], "grade_score": 1.0, "num_commands": 11, "reward": 1.0, "task_id": "easy-7-001", "terminated": true, "truncated": false}
+{"difficulty": "medium", "done": true, "episode": 5, "errors": [], "grade_score": 0.8272, "num_commands": 27, "reward": 0.8272, "task_id": "medium-7-001", "terminated": false, "truncated": true}
+{"difficulty": "hard", "done": true, "episode": 6, "errors": [], "grade_score": 0.4711, "num_commands": 26, "reward": 0.4711, "task_id": "hard-7-001", "terminated": false, "truncated": true}
+{"difficulty": "easy", "done": true, "episode": 7, "errors": [], "grade_score": 1.0, "num_commands": 11, "reward": 1.0, "task_id": "easy-7-002", "terminated": true, "truncated": false}
+{"difficulty": "medium", "done": true, "episode": 8, "errors": [], "grade_score": 0.8272, "num_commands": 27, "reward": 0.8272, "task_id": "medium-7-002", "terminated": false, "truncated": true}
+{"difficulty": "hard", "done": true, "episode": 9, "errors": [], "grade_score": 0.4711, "num_commands": 26, "reward": 0.4711, "task_id": "hard-7-002", "terminated": false, "truncated": true}
+{"difficulty": "easy", "done": true, "episode": 10, "errors": [], "grade_score": 1.0, "num_commands": 11, "reward": 1.0, "task_id": "easy-7-003", "terminated": true, "truncated": false}
