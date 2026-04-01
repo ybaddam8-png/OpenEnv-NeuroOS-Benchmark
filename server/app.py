@@ -40,6 +40,8 @@ def get_state():
     # Assuming obs is easily retrievable, or we just reset to get state
     return {"status": "active"}
 
-if __name__ == "__main__":
-    # Hugging Face Spaces strictly require port 7860
+def main():
     uvicorn.run(app, host="0.0.0.0", port=7860)
+
+if __name__ == "__main__":
+    main()

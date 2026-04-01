@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "neuroos-benchmark"
+version = "0.1.0"
+description = "NeuRoOS Benchmark for OpenEnv"
+requires-python = ">=3.10"
+dependencies = [
+    "openenv-core>=0.2.0",
+]
+
+[project.scripts]
+server = "server.app:main"
