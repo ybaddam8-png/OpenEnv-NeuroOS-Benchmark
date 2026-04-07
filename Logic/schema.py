@@ -133,6 +133,10 @@ VALID_OPS = {
     "reparent",            # move node to a new parent (hard task only)
     "merge_nodes",         # merge two sibling nodes into one (hard task only)
     "set_cognitive_weight",# directly set cognitive_weight on a node
+    "delete_node",         # remove node from DOM tree entirely
+    "simplify_text",       # reduce complexity of node text
+    "disable_autoplay",    # neutralise autoplay distractions
+    "remove_animation",    # neutralise animation elements
 }
 
 @dataclass
@@ -159,6 +163,10 @@ class MutationCommand:
         reparent            -> str    (new parent node_id)
         merge_nodes         -> str    (sibling node_id to merge with)
         set_cognitive_weight-> float  (0.0 – 1.0)
+        delete_node         -> None
+        simplify_text       -> str (optional)
+        disable_autoplay    -> None
+        remove_animation    -> None
     """
     op: str
     node_id: str
@@ -212,6 +220,7 @@ class TaskEnvelope:
     task_id: str
     difficulty: str   # "easy" | "medium" | "hard"
     dom: DOMNode
+    task_name: str = "neuro-inclusive-audit"
     biometrics: list[dict] = field(default_factory=list)
     instructions: str = ""
     constraints: dict = field(default_factory=dict)
@@ -220,6 +229,7 @@ class TaskEnvelope:
         return {
             "task_id": self.task_id,
             "difficulty": self.difficulty,
+            "task_name": self.task_name,
             "dom": self.dom.to_dict(),
             "biometrics": self.biometrics,
             "instructions": self.instructions,
@@ -234,6 +244,7 @@ class TaskEnvelope:
         return cls(
             task_id=d["task_id"],
             difficulty=d["difficulty"],
+            task_name=d.get("task_name", "neuro-inclusive-audit"),
             dom=DOMNode.from_dict(d["dom"]),
             biometrics=d.get("biometrics", []),
             instructions=d.get("instructions", ""),

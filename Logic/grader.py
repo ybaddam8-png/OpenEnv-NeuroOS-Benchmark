@@ -414,19 +414,97 @@ def _score_biometric_response(
 
 
 # ---------------------------------------------------------------------------
+# NEW TASK GRADERS
+# ---------------------------------------------------------------------------
+
+def grade_cognitive_load(
+    original_dom: DOMNode,
+    mutated_dom: DOMNode,
+    mutation_log: list[MutationCommand] = None,
+) -> GradeResult:
+    mutation_log = mutation_log or []
+    penalties, exploit = _detect_exploits(original_dom, mutated_dom, mutation_log)
+    if exploit and any(p["amount"] >= PENALTY_BODY_DELETED for p in penalties):
+        return GradeResult(score=0.0, exploit_detected=True, penalties=penalties,
+                           notes="Exploit: root tampered. Score = 0.0.")
+
+    orig_nodes = {n.id: n for n in original_dom.all_nodes()}
+    
+    redundant_target = [nid for nid, n in orig_nodes.items() if "redundancy" in n.metadata.get("violations", [])]
+    dense_text_target = [nid for nid, n in orig_nodes.items() if "high_cognitive_weight" in n.metadata.get("violations", [])]
+
+    correct_deletes = sum(1 for cmd in mutation_log if cmd.op == "delete_node" and cmd.node_id in redundant_target)
+    correct_simplifies = sum(1 for cmd in mutation_log if cmd.op in ("simplify_text", "set_cognitive_weight") and cmd.node_id in dense_text_target)
+
+    del_score = correct_deletes / max(len(redundant_target), 1) if redundant_target else 1.0
+    simp_score = correct_simplifies / max(len(dense_text_target), 1) if dense_text_target else 1.0
+
+    raw_score = 0.5 * del_score + 0.5 * simp_score
+    final_score = _apply_penalties(raw_score, penalties)
+
+    return GradeResult(
+        score=round(final_score, 4),
+        breakdown={"del_score": round(del_score, 4), "simp_score": round(simp_score, 4), "raw_score": round(raw_score, 4)},
+        penalties=penalties,
+        exploit_detected=exploit,
+        notes=f"Cognitive Load. Final: {final_score:.4f}.",
+    )
+
+def grade_sensory_overload(
+    original_dom: DOMNode,
+    mutated_dom: DOMNode,
+    mutation_log: list[MutationCommand] = None,
+) -> GradeResult:
+    mutation_log = mutation_log or []
+    penalties, exploit = _detect_exploits(original_dom, mutated_dom, mutation_log)
+    if exploit and any(p["amount"] >= PENALTY_BODY_DELETED for p in penalties):
+        return GradeResult(score=0.0, exploit_detected=True, penalties=penalties,
+                           notes="Exploit: root tampered. Score = 0.0.")
+
+    orig_nodes = {n.id: n for n in original_dom.all_nodes()}
+    
+    autoplay_target = [nid for nid, n in orig_nodes.items() if "autoplay_video" in n.metadata.get("violations", [])]
+    animation_target = [nid for nid, n in orig_nodes.items() if "animation" in n.metadata.get("violations", [])]
+
+    correct_autoplay = sum(1 for cmd in mutation_log if cmd.op == "disable_autoplay" and cmd.node_id in autoplay_target)
+    correct_animation = sum(1 for cmd in mutation_log if cmd.op in ("remove_animation", "stop_animation") and cmd.node_id in animation_target)
+
+    auto_score = correct_autoplay / max(len(autoplay_target), 1) if autoplay_target else 1.0
+    anim_score = correct_animation / max(len(animation_target), 1) if animation_target else 1.0
+
+    raw_score = 0.5 * auto_score + 0.5 * anim_score
+    final_score = _apply_penalties(raw_score, penalties)
+
+    return GradeResult(
+        score=round(final_score, 4),
+        breakdown={"auto_score": round(auto_score, 4), "anim_score": round(anim_score, 4), "raw_score": round(raw_score, 4)},
+        penalties=penalties,
+        exploit_detected=exploit,
+        notes=f"Sensory Overload. Final: {final_score:.4f}.",
+    )
+
+
+# ---------------------------------------------------------------------------
 # Dispatcher
 # ---------------------------------------------------------------------------
 
 def grade(
+    task_name: str,
     difficulty: str,
     original_dom: DOMNode,
     mutated_dom: DOMNode,
     biometric_stream: list[dict] = None,
     mutation_log: list[MutationCommand] = None,
 ) -> GradeResult:
-    """grade("easy"|"medium"|"hard", orig, mutated, bio?, mutations?) -> GradeResult"""
+    """grade(task_name, difficulty, orig, mutated, bio?, mutations?) -> GradeResult"""
     mutation_log     = mutation_log or []
     biometric_stream = biometric_stream or []
+    
+    if task_name == "cognitive-load-reduction":
+        return grade_cognitive_load(original_dom, mutated_dom, mutation_log)
+    if task_name == "sensory-overload-prevention":
+        return grade_sensory_overload(original_dom, mutated_dom, mutation_log)
+
     if difficulty == "easy":
         return grade_easy(original_dom, mutated_dom, mutation_log)
     elif difficulty == "medium":

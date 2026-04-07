@@ -10,6 +10,10 @@ env = NeuroInclusiveEnv(seed=42)
 class StepAction(BaseModel):
     actions: list
 
+class ResetOptions(BaseModel):
+    task_name: str | None = None
+    difficulty: str | None = None
+
 # 1. The Ping Requirement (Must return 200)
 @app.get("/")
 def health_check():
@@ -17,9 +21,14 @@ def health_check():
 
 # 2. The Reset Endpoint
 @app.post("/reset")
+def reset_env_post(payload: ResetOptions = None):
+    opts = payload.model_dump(exclude_unset=True) if payload else {}
+    obs, info = env.reset(options=opts)
+    return {"observation": obs, "info": info}
+
 @app.get("/reset")
-def reset_env():
-    obs, info = env.reset()
+def reset_env_get():
+    obs, info = env.reset(options={})
     return {"observation": obs, "info": info}
 
 # 3. The Step Endpoint
@@ -37,8 +46,7 @@ def step_env(payload: StepAction):
 # 4. The State Endpoint
 @app.get("/state")
 def get_state():
-    # Assuming obs is easily retrievable, or we just reset to get state
-    return {"status": "active"}
+    return env.state()
 
 def main():
     uvicorn.run(app, host="0.0.0.0", port=7860)

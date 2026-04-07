@@ -109,9 +109,9 @@ class VDOMGenerator:
         self._node_counter += 1
         return f"{prefix}{self._node_counter}"
 
-    def generate(self, difficulty: str) -> DOMNode:
+    def generate(self, difficulty: str, task_name: str = "neuro-inclusive-audit") -> DOMNode:
         """
-        Generate a DOM tree for the given difficulty level.
+        Generate a DOM tree for the given difficulty level and task name.
         Returns a DOMNode root with violations injected per the difficulty profile.
         """
         if difficulty not in DIFFICULTY_PROFILES:
@@ -136,7 +136,7 @@ class VDOMGenerator:
 
         # Inject violations
         all_nodes = root.all_nodes()
-        self._inject_violations(all_nodes, profile)
+        self._inject_violations(all_nodes, profile, task_name)
 
         # Mark ground truth on metadata
         root.metadata["difficulty"] = difficulty
@@ -204,13 +204,22 @@ class VDOMGenerator:
     # Violation injector
     # ------------------------------------------------------------------
 
-    def _inject_violations(self, nodes: list[DOMNode], profile: dict):
+    def _inject_violations(self, nodes: list[DOMNode], profile: dict, task_name: str):
         """
         Walk all nodes and inject violations based on the difficulty profile.
         Marks injected violations in node.metadata["violations"] for ground truth.
         """
         violation_types = profile["violation_types"]
         rate = profile["violation_rate"]
+        
+        if task_name == "cognitive-load-reduction":
+            violation_types = ["redundancy", "high_cognitive_weight", "deep_nesting"]
+            profile["allow_redundancy"] = True
+            rate = max(rate, 0.6)
+        elif task_name == "sensory-overload-prevention":
+            violation_types = ["animation", "high_sensory_load", "autoplay_video"]
+            profile["allow_animation"] = True
+            rate = max(rate, 0.6)
 
         # Track texts we've already used (for redundancy injection)
         texts_used: list[str] = []
@@ -278,6 +287,12 @@ class VDOMGenerator:
                 node.metadata["violations"] = ["contextual_trap"]   # parent is the bug
                 child.metadata["trap_bait"] = True                  # child is the decoy
                 injected.append("contextual_trap")
+
+            elif vtype == "autoplay_video":
+                node.tag = "video"
+                node.attributes["autoplay"] = True
+                node.attributes["sensory_load"] = 1.0
+                injected.append("autoplay_video")
 
             if injected:
                 node.metadata["violations"] = injected

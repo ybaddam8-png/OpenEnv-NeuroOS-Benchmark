@@ -74,44 +74,78 @@ def check_env_health() -> bool:
 # ---------------------------------------------------------------------------
 # FIXED FALLBACK – always finds any untried (node_id, op) pair
 # ---------------------------------------------------------------------------
-def get_fallback_actions(obs: dict, attempted_set: Set[Tuple[str, str]], max_actions: int = 4) -> List[dict]:
-    nodes = obs.get("nodes", [])
+def get_fallback_actions(obs: dict, attempted_set: Set[Tuple[str, str]], task_name: str, max_actions: int = 4) -> List[dict]:
+    nodes = obs.get("nodes", []) or []
+    nodes = obs.get("dom", {}).get("children", []) if "dom" in obs and not nodes else nodes
+    
+    # Flatten the dom to find nodes if they are structured nested
+    def flatten_dom(node, acc=None):
+        if acc is None: acc = []
+        if isinstance(node, dict):
+            acc.append(node)
+            for child in node.get("children", []):
+                flatten_dom(child, acc)
+        return acc
+    
+    if "dom" in obs:
+        nodes = flatten_dom(obs["dom"])
+
     if not nodes:
         return []
 
     actions = []
-    # Priority order for ops (heuristic)
-    ops_priority = ["set_aria_label", "set_contrast", "set_font_size"]
+    
+    if task_name == "cognitive-load-reduction":
+        ops_priority = ["delete_node", "simplify_text"]
+    elif task_name == "sensory-overload-prevention":
+        ops_priority = ["disable_autoplay", "remove_animation", "stop_animation"]
+    else:
+        ops_priority = ["set_aria_label", "set_contrast", "set_font_size"]
 
     # First pass: use heuristics (missing aria_label, low contrast, small font)
     for node in nodes:
         nid = node.get("id", "node0")
-        if not node.get("aria_label") and (nid, "set_aria_label") not in attempted_set:
-            label = f"{node.get('type', 'element').capitalize()}_{nid}"
-            actions.append({"op": "set_aria_label", "node_id": nid, "value": label})
-        elif node.get("contrast", 99) < 4.5 and (nid, "set_contrast") not in attempted_set:
-            actions.append({"op": "set_contrast", "node_id": nid, "value": 4.5})
-        elif node.get("font_size", 99) < 16 and (nid, "set_font_size") not in attempted_set:
-            actions.append({"op": "set_font_size", "node_id": nid, "value": 16})
+        attrs = node.get("attributes", {})
+        
+        if task_name == "cognitive-load-reduction":
+            if attrs.get("is_redundant", False) and (nid, "delete_node") not in attempted_set:
+                actions.append({"op": "delete_node", "node_id": nid})
+            elif attrs.get("cognitive_weight", 0) > 0.5 and (nid, "simplify_text") not in attempted_set:
+                actions.append({"op": "simplify_text", "node_id": nid, "value": "Simplified text"})
+        elif task_name == "sensory-overload-prevention":
+            if attrs.get("autoplay", False) and (nid, "disable_autoplay") not in attempted_set:
+                actions.append({"op": "disable_autoplay", "node_id": nid})
+            elif attrs.get("animated", False) and (nid, "remove_animation") not in attempted_set:
+                actions.append({"op": "remove_animation", "node_id": nid})
+        else:
+            if not attrs.get("aria_label") and (nid, "set_aria_label") not in attempted_set:
+                label = f"{node.get('tag', 'element').capitalize()}_{nid}"
+                actions.append({"op": "set_aria_label", "node_id": nid, "value": label})
+            elif attrs.get("contrast_ratio", 99) < 4.5 and (nid, "set_contrast") not in attempted_set:
+                actions.append({"op": "set_contrast", "node_id": nid, "value": 4.5})
+            elif attrs.get("font_size_px", 99) < 16 and (nid, "set_font_size") not in attempted_set:
+                actions.append({"op": "set_font_size", "node_id": nid, "value": 16})
+        
         if len(actions) >= max_actions:
             return actions[:max_actions]
 
     # Second pass: if still need more, add ANY (node, op) not yet attempted
-    # Iterate in deterministic order (node ids sorted, ops in priority order)
     if len(actions) < max_actions:
         for node in nodes:
             nid = node.get("id", "node0")
             for op in ops_priority:
                 key = (nid, op)
                 if key not in attempted_set:
-                    # Choose a sensible default value for the op
+                    val = None
                     if op == "set_contrast":
                         val = 4.5
                     elif op == "set_aria_label":
-                        val = f"{node.get('type', 'element').capitalize()}_{nid}"
-                    else:  # set_font_size
+                        val = f"{node.get('tag', 'element').capitalize()}_{nid}"
+                    elif op == "set_font_size":
                         val = 16
-                    actions.append({"op": op, "node_id": nid, "value": val})
+                    elif op == "simplify_text":
+                        val = "Simplified text"
+                    actions.append({"op": op, "node_id": nid, "value": val} if val is not None else {"op": op, "node_id": nid})
                     if len(actions) >= max_actions:
                         return actions[:max_actions]
 
@@ -131,12 +165,12 @@ def deduplicate_actions(actions: List[dict], attempted_set: Set[Tuple[str, str]]
 # ---------------------------------------------------------------------------
 # Prompt (includes attempted_set)
 # ---------------------------------------------------------------------------
-def build_prompt(obs: dict, reward_history: List[float], action_history: List[list], attempted_set: Set[Tuple[str, str]]) -> str:
+def build_prompt(obs: dict, reward_history: List[float], action_history: List[list], attempted_set: Set[Tuple[str, str]], task_name: str) -> str:
     last_reward = reward_history[-1] if reward_history else None
     last_action = action_history[-1] if action_history else None
 
     if last_reward is None:
-        feedback = "First step. Fix the most critical accessibility issues."
+        feedback = "First step. Fix the most critical issues."
     elif last_reward > 0:
         feedback = f"Last reward: +{last_reward:.2f}. Good. Fix OTHER nodes not yet touched."
     elif last_reward < 0:
@@ -144,28 +178,43 @@ def build_prompt(obs: dict, reward_history: List[float], action_history: List[li
     else:
         feedback = "Last reward: 0.0. Those nodes are already fixed. Move to different nodes/ops."
 
-    nodes = [
-        {"id": n.get("id"), "type": n.get("type"),
-         "contrast": n.get("contrast"), "aria_label": n.get("aria_label"),
-         "font_size": n.get("font_size")}
-        for n in obs.get("nodes", [])
-    ]
+    nodes = []
+    # Similar flatten logic for LLM observation
+    def flatten_dom(node, acc=None):
+        if acc is None: acc = []
+        if isinstance(node, dict):
+            acc.append(node)
+            for child in node.get("children", []):
+                flatten_dom(child, acc)
+        return acc
+    
+    dom_nodes = flatten_dom(obs.get("dom", {})) if "dom" in obs else obs.get("nodes", [])
+    
+    for n in dom_nodes:
+        attrs = n.get("attributes", {})
+        nodes.append({
+            "id": n.get("id"), "tag": n.get("tag"),
+            "contrast": attrs.get("contrast_ratio"), 
+            "aria_label": attrs.get("aria_label"),
+            "font_size": attrs.get("font_size_px"),
+            "cognitive_weight": attrs.get("cognitive_weight"),
+            "is_redundant": attrs.get("is_redundant"),
+            "autoplay": attrs.get("autoplay"),
+            "animated": attrs.get("animated")
+        })
 
     attempted_list = [{"node_id": nid, "op": op} for (nid, op) in attempted_set]
 
     return (
-        "You are a Neuro-Inclusive UI Auditor. Maximise accessibility reward.\n\n"
+        f"You are navigating task: {task_name}. Maximise reward.\n\n"
         f"NODES: {json.dumps(nodes)}\n"
         f"ALREADY ATTEMPTED (do NOT repeat these): {json.dumps(attempted_list)}\n"
         f"FEEDBACK: {feedback}\n\n"
         "RULES:\n"
-        "- set_contrast: value>=4.5 where contrast<4.5\n"
-        "- set_aria_label: descriptive string where aria_label is null\n"
-        "- set_font_size: value>=16 where font_size<16\n"
-        "- Never repeat a node_id+op pair already in history\n"
-        "- Max 4 actions per step\n\n"
+        "- Max 4 actions per step\n"
+        "- Never repeat a node_id+op pair already in history\n\n"
         'OUTPUT: valid JSON only, no markdown.\n'
-        '{"actions":[{"op":"set_contrast","node_id":"n1","value":4.5}]}'
+        '{"actions":[{"op":"op_name","node_id":"n1"}]}'
     )
 
 # ---------------------------------------------------------------------------
@@ -177,8 +226,9 @@ def get_llm_action(
     reward_history: List[float],
     action_history: List[list],
     attempted_set: Set[Tuple[str, str]],
+    task_name: str
 ) -> Optional[list]:
-    prompt = build_prompt(obs, reward_history, action_history, attempted_set)
+    prompt = build_prompt(obs, reward_history, action_history, attempted_set, task_name)
     try:
         completion = client.chat.completions.create(
             model=MODEL_NAME,
@@ -216,9 +266,9 @@ def safe_parse(res: requests.Response, label: str) -> Optional[dict]:
         return None
 
 # ---------------------------------------------------------------------------
-# Main – with corrected early termination logic
+# Main – Evaluate All 3 tasks
 # ---------------------------------------------------------------------------
-def main() -> None:
+def run_task(client: OpenAI, task_name: str) -> None:
     rewards:        List[float] = []
     action_history: List[list]  = []
     attempted_set:  Set[Tuple[str, str]] = set()
@@ -227,47 +277,35 @@ def main() -> None:
     success     = False
     done        = False
 
-    log_start(task=TASK_NAME, env=BENCHMARK, model=MODEL_NAME)
-
-    if not check_env_health():
-        print("[DEBUG] Environment unreachable. Aborting.", flush=True)
-        log_end(success=False, steps=0, score=0.0, rewards=[])
-        return
-
-    client = build_openai_client()
+    log_start(task=task_name, env=BENCHMARK, model=MODEL_NAME)
 
     try:
-        reset_res = requests.post(f"{ENV_URL}/reset", json={}, timeout=10)
+        reset_res = requests.post(f"{ENV_URL}/reset", json={"task_name": task_name}, timeout=10)
         reset_res.raise_for_status()
         obs = safe_parse(reset_res, "/reset") or {}
+        obs = obs.get("observation", obs)
 
         for step in range(1, MAX_STEPS + 1):
-            # 1. Get raw actions (LLM or fallback)
-            raw_actions = get_llm_action(client, obs, rewards, action_history, attempted_set)
+            raw_actions = get_llm_action(client, obs, rewards, action_history, attempted_set, task_name)
             if raw_actions is None:
-                raw_actions = get_fallback_actions(obs, attempted_set)
-                print(f"[DEBUG] Step {step}: LLM unavailable — using smart fallback.", flush=True)
+                raw_actions = get_fallback_actions(obs, attempted_set, task_name)
+                print(f"[DEBUG] Step {step}: LLM unavailable or error — using smart fallback.", flush=True)
 
-            # 2. Deduplicate: remove any already attempted
             actions = deduplicate_actions(raw_actions, attempted_set)
 
-            # 3. If no actions after dedup, try to generate fresh ones
             if not actions:
                 print(f"[DEBUG] Step {step}: No new actions after dedup. Generating fresh fallback actions.", flush=True)
-                actions = get_fallback_actions(obs, attempted_set)
+                actions = get_fallback_actions(obs, attempted_set, task_name)
                 if not actions:
-                    # No legal actions left – episode ends naturally
                     print("[DEBUG] No remaining untried (node, op) pairs. Ending episode.", flush=True)
                     break
 
-            # 4. Record these actions as attempted
             for a in actions:
                 attempted_set.add((a.get("node_id"), a.get("op")))
 
             action_history.append(actions)
             action_str = json.dumps(actions).replace(" ", "")
 
-            # 5. Send to environment
             step_res = requests.post(
                 f"{ENV_URL}/step",
                 json={"actions": actions},
@@ -285,7 +323,7 @@ def main() -> None:
 
             obs    = result.get("observation", {})
             reward = float(result.get("reward", 0.0))
-            done   = bool(result.get("done", False))
+            done   = bool(result.get("done", result.get("terminated", False) or result.get("truncated", False)))
             error  = result.get("error", None)
 
             rewards.append(reward)
@@ -302,6 +340,22 @@ def main() -> None:
         print(f"[DEBUG] Fatal error: {exc}", flush=True)
     finally:
         log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
+
+def main() -> None:
+    if not check_env_health():
+        print("[DEBUG] Environment unreachable. Aborting.", flush=True)
+        return
+
+    client = build_openai_client()
+    
+    tasks_to_test = [
+        "neuro-inclusive-audit",
+        "cognitive-load-reduction",
+        "sensory-overload-prevention"
+    ]
+    
+    for t in tasks_to_test:
+        run_task(client, t)
 
 if __name__ == "__main__":
     main()

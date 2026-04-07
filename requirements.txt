@@ -3,3 +3,4 @@ gymnasium
 fastapi
 uvicorn
 requests
+httpx

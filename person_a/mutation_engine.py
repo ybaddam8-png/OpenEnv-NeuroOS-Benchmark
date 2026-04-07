@@ -177,6 +177,32 @@ class MutationEngine:
             value = self._coerce_float(cmd.value, key="cognitive_weight")
             node.attributes["cognitive_weight"] = max(0.0, min(1.0, round(value, 2)))
             return self._log(cmd.to_dict(), True, f"cognitive_weight set to {node.attributes['cognitive_weight']}")
+            
+        if op == "delete_node":
+            if node.id == self.dom.id:
+                return self._log(cmd.to_dict(), False, "cannot delete the root node")
+            parent = self.find_parent(node.id)
+            if parent:
+                parent.children = [c for c in parent.children if c.id != node.id]
+            return self._log(cmd.to_dict(), True, "node deleted")
+
+        if op == "simplify_text":
+            if cmd.value and isinstance(cmd.value, str):
+                node.text = cmd.value.strip()
+            else:
+                node.text = "[Simplified]"
+            node.attributes["cognitive_weight"] = round(min(self._read_float(node.attributes.get("cognitive_weight"), 0.5), 0.3), 2)
+            return self._log(cmd.to_dict(), True, "text simplified")
+            
+        if op == "disable_autoplay":
+            node.attributes["autoplay"] = False
+            return self._log(cmd.to_dict(), True, "autoplay disabled")
+            
+        if op == "remove_animation":
+            node.attributes["animated"] = False
+            node.attributes["flashing"] = False
+            node.attributes["animation"] = "none"
+            return self._log(cmd.to_dict(), True, "animation removed")
 
         if op == "remove_redundancy":
             return self._remove_redundancy(cmd, node)

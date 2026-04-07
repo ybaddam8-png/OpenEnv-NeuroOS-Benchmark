@@ -118,6 +118,38 @@ CONSTRAINTS = {
 }
 
 
+INSTRUCTIONS_COGNITIVE = { diff: """You are an accessibility engineer focusing on Cognitive Load Reduction.
+Your goal is to simplify the UI to accommodate users who are easily overwhelmed.
+Find text elements that are long or complicated and simplify them using 'simplify_text'.
+Delete purely redundant or duplicate nodes using 'delete_node'.
+Do NOT delete essential navigation or structural elements.
+""" for diff in ["easy", "medium", "hard"] }
+
+CONSTRAINTS_COGNITIVE = {
+    diff: {
+        "allowed_ops": ["delete_node", "simplify_text"],
+        "forbidden_ops": [],
+        "must_preserve_tags": ["main", "nav", "header", "footer"],
+        "min_node_retention": 0.50,
+    } for diff in ["easy", "medium", "hard"]
+}
+
+INSTRUCTIONS_SENSORY = { diff: """You are an accessibility engineer focusing on Sensory Overload Prevention.
+Your goal is to neutralize distracting elements that trigger sensory overload.
+Find autoplaying videos or heavy animations.
+Use 'disable_autoplay' and 'remove_animation' to disable them immediately.
+""" for diff in ["easy", "medium", "hard"] }
+
+CONSTRAINTS_SENSORY = {
+    diff: {
+        "allowed_ops": ["disable_autoplay", "remove_animation", "reduce_sensory_load", "stop_animation"],
+        "forbidden_ops": [],
+        "must_preserve_tags": ["main"],
+        "min_node_retention": 1.0,
+    } for diff in ["easy", "medium", "hard"]
+}
+
+
 # ---------------------------------------------------------------------------
 # Task Factory
 # ---------------------------------------------------------------------------
@@ -135,14 +167,15 @@ class TaskFactory:
     def __init__(self, seed: int = 42):
         self.base_seed = seed
 
-    def create(self, difficulty: str, seed: int = None) -> TaskEnvelope:
+    def create(self, difficulty: str, seed: int = None, task_name: str = "neuro-inclusive-audit") -> TaskEnvelope:
         """
-        Create a complete task envelope for the given difficulty.
+        Create a complete task envelope for the given difficulty and task.
 
         Parameters
         ----------
         difficulty  : "easy" | "medium" | "hard"
         seed        : override seed (defaults to self.base_seed)
+        task_name   : string identifier for the task type
         """
         if difficulty not in ("easy", "medium", "hard"):
             raise ValueError("difficulty must be easy, medium, or hard")
@@ -151,7 +184,7 @@ class TaskFactory:
 
         # Generate DOM
         vdom_gen = VDOMGenerator(seed=s)
-        dom = vdom_gen.generate(difficulty)
+        dom = vdom_gen.generate(difficulty, task_name=task_name)
 
         # Generate biometrics (only meaningful for medium/hard, but always present)
         all_node_ids = [n.id for n in dom.all_nodes()]
@@ -162,20 +195,30 @@ class TaskFactory:
         lint_result = lint(dom)
         dom.metadata["initial_lint"] = lint_result.to_dict()
 
-        task_id = f"task_{difficulty}_{s}"
+        task_id = f"task_{task_name}_{difficulty}_{s}"
+
+        if task_name == "cognitive-load-reduction":
+            inst = INSTRUCTIONS_COGNITIVE[difficulty]
+            cons = CONSTRAINTS_COGNITIVE[difficulty]
+        elif task_name == "sensory-overload-prevention":
+            inst = INSTRUCTIONS_SENSORY[difficulty]
+            cons = CONSTRAINTS_SENSORY[difficulty]
+        else:
+            inst = INSTRUCTIONS[difficulty]
+            cons = CONSTRAINTS[difficulty]
 
         return TaskEnvelope(
             task_id=task_id,
             difficulty=difficulty,
+            task_name=task_name,
             dom=dom,
             biometrics=biometrics if difficulty in ("medium", "hard") else [],
-            instructions=INSTRUCTIONS[difficulty],
-            constraints=CONSTRAINTS[difficulty],
+            instructions=inst,
+            constraints=cons,
         )
 
-    def create_batch(self, difficulty: str, count: int, start_seed: int = 0) -> list[TaskEnvelope]:
+    def create_batch(self, difficulty: str, count: int, start_seed: int = 0, task_name: str = "neuro-inclusive-audit") -> list[TaskEnvelope]:
         """
         Create multiple tasks at the same difficulty with sequential seeds.
-        Useful for eval runs.
         """
-        return [self.create(difficulty, seed=start_seed + i) for i in range(count)]
+        return [self.create(difficulty, seed=start_seed + i, task_name=task_name) for i in range(count)]

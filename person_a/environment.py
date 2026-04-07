@@ -95,7 +95,13 @@ class NeuroInclusiveEnv(BaseEnv):
                 f"Valid values: {self.difficulty_cycle}"
             )
 
-        self.current_task = self.task_factory.create(difficulty)
+        import random
+        task_names = ["neuro-inclusive-audit", "cognitive-load-reduction", "sensory-overload-prevention"]
+        task_name = options.get("task_name")
+        if not task_name or task_name not in task_names:
+            task_name = random.choice(task_names)
+
+        self.current_task = self.task_factory.create(difficulty, task_name=task_name)
         self.original_dom = copy.deepcopy(self.current_task.dom)
         self.current_dom = copy.deepcopy(self.current_task.dom)
         self.mutation_engine = MutationEngine(self.current_dom)
@@ -150,7 +156,7 @@ class NeuroInclusiveEnv(BaseEnv):
                 grader_commands.append(MutationCommand(op="invalid", node_id="invalid"))
 
         # Pass the strict objects to your grader!
-        grade_result = grade(self.current_task.difficulty, self.original_dom, self.current_dom, self.current_task.biometrics, grader_commands)
+        grade_result = grade(self.current_task.task_name, self.current_task.difficulty, self.original_dom, self.current_dom, self.current_task.biometrics, grader_commands)
         reward = round(grade_result.score - self.last_score, 4)
         self.last_score = grade_result.score
         self.last_grade = grade_result.to_dict()
