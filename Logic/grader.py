@@ -180,8 +180,8 @@ def grade_easy(
 
     penalties, exploit = _detect_exploits(original_dom, mutated_dom, mutation_log)
     if exploit and any(p["amount"] >= PENALTY_BODY_DELETED for p in penalties):
-        return GradeResult(score=0.0001, exploit_detected=True, penalties=penalties,
-                           notes="Exploit: root tampered. Score = 0.0001.")
+        return GradeResult(score=0.1, exploit_detected=True, penalties=penalties,
+                           notes="Exploit: root tampered. Score = 0.1.")
 
     orig_lint    = lint(original_dom)
     mut_lint     = lint(mutated_dom)
@@ -191,7 +191,7 @@ def grade_easy(
     final_score  = _apply_penalties(raw_score, penalties)
 
     return GradeResult(
-        score=max(0.0001, min(0.9999, round(final_score, 4))),
+        score=max(0.1, min(0.9, round(final_score, 4))),
         breakdown={"contrast_fix": round(contrast_fix, 4),
                    "aria_fix":     round(aria_fix, 4),
                    "raw_score":    round(raw_score, 4)},
@@ -216,8 +216,8 @@ def grade_medium(
 
     penalties, exploit = _detect_exploits(original_dom, mutated_dom, mutation_log)
     if exploit and any(p["amount"] >= PENALTY_BODY_DELETED for p in penalties):
-        return GradeResult(score=0.0001, exploit_detected=True, penalties=penalties,
-                           notes="Exploit: root tampered. Score = 0.0001.")
+        return GradeResult(score=0.1, exploit_detected=True, penalties=penalties,
+                           notes="Exploit: root tampered. Score = 0.1.")
 
     orig_lint      = lint(original_dom)
     mut_lint       = lint(mutated_dom)
@@ -250,7 +250,7 @@ def grade_medium(
         })
 
     return GradeResult(
-        score=max(0.0001, min(0.9999, round(final_score, 4))),
+        score=max(0.1, min(0.9, round(final_score, 4))),
         breakdown={"contrast_fix":       round(contrast_fix, 4),
                    "aria_fix":           round(aria_fix, 4),
                    "redundancy_fix":     round(redundancy_fix, 4),
@@ -310,8 +310,8 @@ def grade_hard(
 
     penalties, exploit = _detect_exploits(original_dom, mutated_dom, mutation_log)
     if exploit and any(p["amount"] >= PENALTY_BODY_DELETED for p in penalties):
-        return GradeResult(score=0.0001, exploit_detected=True, penalties=penalties,
-                           notes="Exploit: root tampered. Score = 0.0001.")
+        return GradeResult(score=0.1, exploit_detected=True, penalties=penalties,
+                           notes="Exploit: root tampered. Score = 0.1.")
 
     orig_lint = lint(original_dom)
     mut_lint  = lint(mutated_dom)
@@ -358,7 +358,7 @@ def grade_hard(
         })
 
     return GradeResult(
-        score=max(0.0001, min(0.9999, round(final_score, 4))),
+        score=max(0.1, min(0.9, round(final_score, 4))),
         breakdown={"accessibility_delta":  round(accessibility_delta, 4),
                    "structural_integrity": round(structural_integrity, 4),
                    "biometric_response":   round(biometric_response, 4),
@@ -425,8 +425,8 @@ def grade_cognitive_load(
     mutation_log = mutation_log or []
     penalties, exploit = _detect_exploits(original_dom, mutated_dom, mutation_log)
     if exploit and any(p["amount"] >= PENALTY_BODY_DELETED for p in penalties):
-        return GradeResult(score=0.0001, exploit_detected=True, penalties=penalties,
-                           notes="Exploit: root tampered. Score = 0.0001.")
+        return GradeResult(score=0.1, exploit_detected=True, penalties=penalties,
+                           notes="Exploit: root tampered. Score = 0.1.")
 
     orig_nodes = {n.id: n for n in original_dom.all_nodes()}
     
@@ -443,7 +443,7 @@ def grade_cognitive_load(
     final_score = _apply_penalties(raw_score, penalties)
 
     return GradeResult(
-        score=max(0.0001, min(0.9999, round(final_score, 4))),
+        score=max(0.1, min(0.9, round(final_score, 4))),
         breakdown={"del_score": round(del_score, 4), "simp_score": round(simp_score, 4), "raw_score": round(raw_score, 4)},
         penalties=penalties,
         exploit_detected=exploit,
@@ -458,8 +458,8 @@ def grade_sensory_overload(
     mutation_log = mutation_log or []
     penalties, exploit = _detect_exploits(original_dom, mutated_dom, mutation_log)
     if exploit and any(p["amount"] >= PENALTY_BODY_DELETED for p in penalties):
-        return GradeResult(score=0.0001, exploit_detected=True, penalties=penalties,
-                           notes="Exploit: root tampered. Score = 0.0001.")
+        return GradeResult(score=0.1, exploit_detected=True, penalties=penalties,
+                           notes="Exploit: root tampered. Score = 0.1.")
 
     orig_nodes = {n.id: n for n in original_dom.all_nodes()}
     
@@ -476,7 +476,7 @@ def grade_sensory_overload(
     final_score = _apply_penalties(raw_score, penalties)
 
     return GradeResult(
-        score=max(0.0001, min(0.9999, round(final_score, 4))),
+        score=max(0.1, min(0.9, round(final_score, 4))),
         breakdown={"auto_score": round(auto_score, 4), "anim_score": round(anim_score, 4), "raw_score": round(raw_score, 4)},
         penalties=penalties,
         exploit_detected=exploit,
