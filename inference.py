@@ -333,7 +333,8 @@ def run_task(client: OpenAI, task_name: str) -> None:
             if done:
                 break
 
-        score   = min(max(sum(rewards) / len(rewards), 0.0), 1.0) if rewards else 0.0
+        raw_score = sum(rewards) if rewards else 0.0001
+        score = max(0.0001, min(0.9999, raw_score))
         success = done
 
     except Exception as exc:
